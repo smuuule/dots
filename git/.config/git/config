@@ -1,0 +1,25 @@
+# See https://git-scm.com/docs/git-config
+[user]
+  name = Samuel Runmark Thunell
+  email = samuel.runmark@gmail.com
+	signingkey = /home/smule/.ssh/id_ed25519.pub
+[pull]
+	rebase = true
+[init]
+	defaultBranch = main
+[commit]
+	verbose = true
+  gpgsign = true
+[gpg]
+  format = ssh
+[rerere]
+	enabled = true
+	autoupdate = true
+[url "git@github.com:"]
+	insteadOf = "https://github.com/"
+[credential "https://github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/usr/bin/gh auth git-credential
