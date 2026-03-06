@@ -80,10 +80,12 @@ export NVM_DIR="$HOME/.nvm"
 export CHROME_EXECUTABLE=/usr/bin/chromium
 export PATH="$HOME/fvm/default/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/go/bin:$PATH"
 export PATH="/opt/cuda/bin:$PATH"
 export CUDA_PATH="/opt/cuda"
 export NVCC_CCBIN="/usr/bin/g++"
 export XDG_DATA_DIRS="$XDG_DATA_DIRS:$HOME/Desktop"
+export MAKEFLAGS="-j$(nproc)"
 
 ## [Completion]
 ## Completion scripts setup. Remove the following line to uninstall
@@ -93,3 +95,6 @@ export XDG_DATA_DIRS="$XDG_DATA_DIRS:$HOME/Desktop"
 
 
 [ -f "/home/smule/.ghcup/env" ] && . "/home/smule/.ghcup/env" # ghcup-env
+
+# Generated for envman. Do not edit.
+[ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
