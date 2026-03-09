@@ -24,7 +24,7 @@ load_saved_wallpapers() {
     image="${image%"${image##*[![:space:]]}"}"
     [[ -n "$monitor" && -n "$image" ]] || continue
     SAVED_WALLPAPERS["$monitor"]="$image"
-  done < "$swww_conf"
+  done <"$swww_conf"
 }
 
 write_conf() {
@@ -37,7 +37,7 @@ write_conf() {
       image="${SAVED_WALLPAPERS[$monitor]}"
       [[ -n "$image" ]] && echo "$monitor=$image"
     done
-  } > "$tmp_conf"
+  } >"$tmp_conf"
 
   mv "$tmp_conf" "$swww_conf"
 }
@@ -61,7 +61,7 @@ set_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
 
-  swww img -o "$target_monitor" "$image_path" --transition-type wipe --transition-fps 60 --transition-duration 2
+  swww img -o "$target_monitor" "$image_path" --transition-type simple --transition-fps 60 --transition-duration 1
 }
 
 apply_wallpaper() {
