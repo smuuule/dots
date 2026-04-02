@@ -1,6 +1,6 @@
 #!/bin/bash
 scripts="$HOME/.config/hypr/scripts"
-swww_conf="$HOME/.config/hypr/wallpapers.conf"
+awww_conf="$HOME/.config/hypr/wallpapers.conf"
 
 focused_monitor=$(hyprctl monitors | awk '/^Monitor/{name=$2} /focused: yes/{print name}')
 mapfile -t MONITORS < <(hyprctl monitors | awk '/^Monitor/{print $2}')
@@ -10,7 +10,7 @@ wallDIR="$HOME/Pictures/wallpapers"
 declare -A SAVED_WALLPAPERS
 
 load_saved_wallpapers() {
-  [[ -f "$swww_conf" ]] || return 0
+  [[ -f "$awww_conf" ]] || return 0
 
   while IFS= read -r line; do
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
@@ -24,7 +24,7 @@ load_saved_wallpapers() {
     image="${image%"${image##*[![:space:]]}"}"
     [[ -n "$monitor" && -n "$image" ]] || continue
     SAVED_WALLPAPERS["$monitor"]="$image"
-  done <"$swww_conf"
+  done <"$awww_conf"
 }
 
 write_conf() {
@@ -39,7 +39,7 @@ write_conf() {
     done
   } >"$tmp_conf"
 
-  mv "$tmp_conf" "$swww_conf"
+  mv "$tmp_conf" "$awww_conf"
 }
 
 persist_wallpaper() {
@@ -49,9 +49,9 @@ persist_wallpaper() {
   write_conf
 }
 
-ensure_swww() {
-  if ! pgrep -x swww-daemon >/dev/null; then
-    swww-daemon >/dev/null 2>&1 &
+ensure_awww() {
+  if ! pgrep -x awww-daemon >/dev/null; then
+    awww-daemon >/dev/null 2>&1 &
     disown
     sleep 0.5
   fi
@@ -61,7 +61,7 @@ set_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
 
-  swww img -o "$target_monitor" "$image_path" --transition-type simple --transition-fps 60 --transition-duration 1
+  awww img -o "$target_monitor" "$image_path" --transition-type simple --transition-fps 60 --transition-duration 1
 }
 
 apply_wallpaper() {
@@ -74,7 +74,7 @@ apply_wallpaper() {
 
 restore_wallpapers() {
   load_saved_wallpapers
-  ensure_swww
+  ensure_awww
 
   for monitor in "${!SAVED_WALLPAPERS[@]}"; do
     local image
@@ -108,7 +108,7 @@ menu() {
 
 main() {
   load_saved_wallpapers
-  ensure_swww
+  ensure_awww
 
   choice=$(menu | ${rofi_command})
 
