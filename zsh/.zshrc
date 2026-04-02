@@ -49,30 +49,6 @@ _cf() {
 }
 compdef _cf cf
 
-# Persistent Neovim config
-[[ -f "$HOME/.config/nvim/nvim-appname.zsh" ]] && source "$HOME/.config/nvim/nvim-appname.zsh"
-nvims() {
-  local config_dir="$HOME/.config"
-  local state_file="$HOME/.config/nvim/nvim-appname.zsh"
-  local app
-
-  app=$(ls -d $config_dir/nvim* 2>/dev/null \
-    | sed "s|$config_dir/||" \
-    | fzf --prompt="Neovim config > " \
-          --height=40% \
-          --border \
-          --exit-0)
-
-  [[ -z "$app" ]] && return 0
-
-  mkdir -p "$(dirname "$state_file")"
-
-  echo "export NVIM_APPNAME=\"$app\"" > "$state_file"
-  export NVIM_APPNAME="$app"
-
-  echo "Switched config to '$app'"
-}
-
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
@@ -98,3 +74,5 @@ export MAKEFLAGS="-j$(nproc)"
 
 # Generated for envman. Do not edit.
 [ -s "$HOME/.config/envman/load.sh" ] && source "$HOME/.config/envman/load.sh"
+export PATH="/home/smule/.config/herd-lite/bin:$PATH"
+export PHP_INI_SCAN_DIR="/home/smule/.config/herd-lite/bin:$PHP_INI_SCAN_DIR"
