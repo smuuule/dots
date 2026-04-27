@@ -1,6 +1,6 @@
 #!/bin/bash
 scripts="$HOME/.config/hypr/scripts"
-awww_conf="$HOME/.config/hypr/wallpapers.conf"
+hyprpaper_conf="$HOME/.config/hypr/hyprpaper.conf"
 
 focused_monitor=$(hyprctl monitors | awk '/^Monitor/{name=$2} /focused: yes/{print name}')
 mapfile -t MONITORS < <(hyprctl monitors | awk '/^Monitor/{print $2}')
@@ -9,49 +9,83 @@ mapfile -t MONITORS < <(hyprctl monitors | awk '/^Monitor/{print $2}')
 wallDIR="$HOME/Pictures/wallpapers"
 declare -A SAVED_WALLPAPERS
 
+get_monitor_desc() {
+  local port="$1"
+  hyprctl monitors | awk -v port="$port" '
+    /^Monitor/{cur_port=$2}
+    /^[[:space:]]*description:/{
+      sub(/^[[:space:]]*description:[[:space:]]*/, "");
+      if(cur_port==port) {print $0}
+    }'
+}
+
 load_saved_wallpapers() {
-  [[ -f "$awww_conf" ]] || return 0
+  [[ -f "$hyprpaper_conf" ]] || return 0
 
   while IFS= read -r line; do
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "$line" ]] && continue
-    local monitor image
-    monitor="${line%%=*}"
-    image="${line#*=}"
-    monitor="${monitor#"${monitor%%[![:space:]]*}"}"
-    monitor="${monitor%"${monitor##*[![:space:]]}"}"
-    image="${image#"${image%%[![:space:]]*}"}"
-    image="${image%"${image##*[![:space:]]}"}"
-    [[ -n "$monitor" && -n "$image" ]] || continue
-    SAVED_WALLPAPERS["$monitor"]="$image"
-  done <"$awww_conf"
+
+    if [[ "$line" =~ ^[[:space:]]*wallpaper[[:space:]]*= ]]; then
+      local mapping="${line#*=}"
+      mapping="${mapping#"${mapping%%[![:space:]]*}"}"
+
+      local monitor="${mapping%%,*}"
+      local image="${mapping#*,}"
+
+      monitor="${monitor#"${monitor%%[![:space:]]*}"}"
+      monitor="${monitor%"${monitor##*[![:space:]]}"}"
+      image="${image#"${image%%[![:space:]]*}"}"
+      image="${image%"${image##*[![:space:]]}"}"
+
+      [[ -n "$monitor" && -n "$image" ]] || continue
+      SAVED_WALLPAPERS["$monitor"]="$image"
+    fi
+  done <"$hyprpaper_conf"
 }
 
 write_conf() {
-  local tmp_conf
-  tmp_conf="$(mktemp)"
-
   {
+    local -A preloaded
     for monitor in "${!SAVED_WALLPAPERS[@]}"; do
-      local image
-      image="${SAVED_WALLPAPERS[$monitor]}"
-      [[ -n "$image" ]] && echo "$monitor=$image"
+      local image="${SAVED_WALLPAPERS[$monitor]}"
+      [[ -n "$image" ]] || continue
+      if [[ -z "${preloaded[$image]:-}" ]]; then
+        echo "preload = $image"
+        preloaded["$image"]=1
+      fi
     done
-  } >"$tmp_conf"
 
-  mv "$tmp_conf" "$awww_conf"
+    echo ""
+
+    for monitor in "${!SAVED_WALLPAPERS[@]}"; do
+      local image="${SAVED_WALLPAPERS[$monitor]}"
+      [[ -n "$image" ]] && echo "wallpaper = $monitor,$image"
+    done
+
+    echo ""
+    echo "splash = false"
+  } >"$hyprpaper_conf"
 }
 
 persist_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
-  SAVED_WALLPAPERS["$target_monitor"]="$image_path"
+
+  local desc
+  desc=$(get_monitor_desc "$target_monitor")
+  if [[ -n "$desc" ]]; then
+    SAVED_WALLPAPERS["desc:$desc"]="$image_path"
+    unset "SAVED_WALLPAPERS[$target_monitor]"
+  else
+    SAVED_WALLPAPERS["$target_monitor"]="$image_path"
+  fi
   write_conf
 }
 
-ensure_awww() {
-  if ! pgrep -x awww-daemon >/dev/null; then
-    awww-daemon >/dev/null 2>&1 &
+ensure_hyprpaper() {
+  if ! pgrep -x hyprpaper >/dev/null; then
+    hyprpaper >/dev/null 2>&1 &
     disown
     sleep 0.5
   fi
@@ -61,7 +95,8 @@ set_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
 
-  awww img -o "$target_monitor" "$image_path" --transition-type simple --transition-fps 60 --transition-duration 1
+  hyprctl hyprpaper preload "$image_path"
+  hyprctl hyprpaper wallpaper "$target_monitor,$image_path"
 }
 
 apply_wallpaper() {
@@ -74,18 +109,14 @@ apply_wallpaper() {
 
 restore_wallpapers() {
   load_saved_wallpapers
-  ensure_awww
+  ensure_hyprpaper
 
-  for monitor in "${!SAVED_WALLPAPERS[@]}"; do
-    local image
-    image="${SAVED_WALLPAPERS[$monitor]}"
-    [[ -n "$monitor" && -n "$image" && -f "$image" ]] || continue
-    set_wallpaper "$monitor" "$image"
-  done
+  pkill -x hyprpaper
+  hyprpaper >/dev/null 2>&1 &
+  disown
 }
 
 # Retrieve image files
-#PICS=($(ls "${wallDIR}" | grep -E ".jpg$|.jpeg$|.png$|.gif$")) # Non-recusrive
 mapfile -t PICS < <(find "${wallDIR}" -type d -name "Dynamic-Wallpapers" -prune -o -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" \) -printf "%P\n")
 RANDOM_PIC="${PICS[$((RANDOM % ${#PICS[@]}))]}"
 RANDOM_PIC_NAME="${#PICS[@]}. random"
@@ -95,7 +126,6 @@ rofi_command="rofi -i -show -dmenu"
 
 menu() {
   for i in "${!PICS[@]}"; do
-    # Displaying .gif to indicate animated images
     if [[ -z $(echo "${PICS[$i]}" | grep .gif$) ]]; then
       printf "$(echo "${PICS[$i]}" | cut -d. -f1)\x00icon\x1f${wallDIR}/${PICS[$i]}\n"
     else
@@ -108,7 +138,7 @@ menu() {
 
 main() {
   load_saved_wallpapers
-  ensure_awww
+  ensure_hyprpaper
 
   choice=$(menu | ${rofi_command})
 
