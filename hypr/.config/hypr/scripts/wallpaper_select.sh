@@ -22,49 +22,40 @@ get_monitor_desc() {
 load_saved_wallpapers() {
   [[ -f "$hyprpaper_conf" ]] || return 0
 
+  local current_monitor=""
+  local current_path=""
+
   while IFS= read -r line; do
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "$line" ]] && continue
 
-    if [[ "$line" =~ ^[[:space:]]*wallpaper[[:space:]]*= ]]; then
-      local mapping="${line#*=}"
-      mapping="${mapping#"${mapping%%[![:space:]]*}"}"
-
-      local monitor="${mapping%%,*}"
-      local image="${mapping#*,}"
-
-      monitor="${monitor#"${monitor%%[![:space:]]*}"}"
-      monitor="${monitor%"${monitor##*[![:space:]]}"}"
-      image="${image#"${image%%[![:space:]]*}"}"
-      image="${image%"${image##*[![:space:]]}"}"
-
-      [[ -n "$monitor" && -n "$image" ]] || continue
-      SAVED_WALLPAPERS["$monitor"]="$image"
+    if [[ "$line" =~ ^[[:space:]]*monitor[[:space:]]*=[[:space:]]*(.*) ]]; then
+      current_monitor="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^[[:space:]]*path[[:space:]]*=[[:space:]]*(.*) ]]; then
+      current_path="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^[[:space:]]*\} ]]; then
+      if [[ -n "$current_monitor" && -n "$current_path" ]]; then
+        SAVED_WALLPAPERS["$current_monitor"]="$current_path"
+      fi
+      current_monitor=""
+      current_path=""
     fi
   done <"$hyprpaper_conf"
 }
 
 write_conf() {
   {
-    local -A preloaded
     for monitor in "${!SAVED_WALLPAPERS[@]}"; do
       local image="${SAVED_WALLPAPERS[$monitor]}"
       [[ -n "$image" ]] || continue
-      if [[ -z "${preloaded[$image]:-}" ]]; then
-        echo "preload = $image"
-        preloaded["$image"]=1
-      fi
+
+      echo "wallpaper {"
+      echo "    monitor = $monitor"
+      echo "    path = $image"
+      echo "    fit_mode = cover"
+      echo "}"
+      echo ""
     done
-
-    echo ""
-
-    for monitor in "${!SAVED_WALLPAPERS[@]}"; do
-      local image="${SAVED_WALLPAPERS[$monitor]}"
-      [[ -n "$image" ]] && echo "wallpaper = $monitor,$image"
-    done
-
-    echo ""
-    echo "splash = false"
   } >"$hyprpaper_conf"
 }
 
@@ -72,14 +63,7 @@ persist_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
 
-  local desc
-  desc=$(get_monitor_desc "$target_monitor")
-  if [[ -n "$desc" ]]; then
-    SAVED_WALLPAPERS["desc:$desc"]="$image_path"
-    unset "SAVED_WALLPAPERS[$target_monitor]"
-  else
-    SAVED_WALLPAPERS["$target_monitor"]="$image_path"
-  fi
+  SAVED_WALLPAPERS["$target_monitor"]="$image_path"
   write_conf
 }
 
@@ -95,25 +79,21 @@ set_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
 
-  hyprctl hyprpaper preload "$image_path"
-  hyprctl hyprpaper wallpaper "$target_monitor,$image_path"
+  if pgrep -x hyprpaper >/dev/null; then
+    pkill hyprpaper
+    sleep 0.2
+  fi
+  hyprpaper >/dev/null 2>&1 &
+  disown
+  sleep 0.2
 }
 
 apply_wallpaper() {
   local target_monitor="$1"
   local image_path="$2"
 
-  set_wallpaper "$target_monitor" "$image_path"
   persist_wallpaper "$target_monitor" "$image_path"
-}
-
-restore_wallpapers() {
-  load_saved_wallpapers
-  ensure_hyprpaper
-
-  pkill -x hyprpaper
-  hyprpaper >/dev/null 2>&1 &
-  disown
+  set_wallpaper "$target_monitor" "$image_path"
 }
 
 # Retrieve image files
@@ -173,11 +153,6 @@ main() {
 }
 
 # Check if rofi is already running
-if [[ "${1:-}" == "--restore" ]]; then
-  restore_wallpapers
-  exit 0
-fi
-
 if pidof rofi >/dev/null; then
   pkill rofi
   exit 0
